@@ -23,33 +23,18 @@ on:
         default: true
     secrets:
       GITOPS_PAT:
-        description: 'Personal Access Token with write access to compute-gitops (deprecated, use GitHub App)'
-        required: false
-      GH_APP_ID:
-        description: 'GitHub App ID (preferred over PAT)'
-        required: false
-      GH_APP_PRIVATE_KEY:
-        description: 'GitHub App Private Key (preferred over PAT)'
-        required: false
+        description: 'Personal Access Token with write access to compute-gitops'
+        required: true
 
 jobs:
   update:
     runs-on: blacksmith-2vcpu-ubuntu-2204
     steps:
-      - name: Generate GitHub App Token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-          owner: s12labs
-          repositories: compute-gitops
-
       - name: Checkout compute-gitops repository
         uses: actions/checkout@v4
         with:
           repository: s12labs/compute-gitops
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ secrets.GITOPS_PAT }}
           path: compute-gitops
 
       - name: Check if app manifests exist

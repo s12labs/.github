@@ -14,17 +14,10 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - name: Generate GitHub App Token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-
       - uses: googleapis/release-please-action@v4
         with:
           release-type: go
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   build-and-deploy:
     if: github.event_name == 'release'
