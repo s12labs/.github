@@ -21,20 +21,36 @@ on:
         required: false
         type: boolean
         default: true
-    secrets:
-      GITOPS_PAT:
-        description: 'Personal Access Token with write access to compute-gitops'
-        required: true
 
 jobs:
   update:
     runs-on: blacksmith-2vcpu-ubuntu-2204
+    permissions:
+      id-token: write
+      contents: read
     steps:
+      - name: Get GitOps token from github-app
+        id: gitops-token
+        run: |
+          echo "Requesting token from github-app..."
+          RESPONSE=$(curl -f -X POST \
+            https://github-app.raven-halfbeak.ts.net/github/workflow-token \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json")
+
+          TOKEN=$(echo "$RESPONSE" | jq -r '.token')
+          REPO=$(echo "$RESPONSE" | jq -r '.repository')
+          WORKFLOW=$(echo "$RESPONSE" | jq -r '.workflow')
+
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "Token obtained for repository: $REPO (workflow: $WORKFLOW)"
+
       - name: Checkout compute-gitops repository
         uses: actions/checkout@v4
         with:
           repository: s12labs/compute-gitops
-          token: ${{ secrets.GITOPS_PAT }}
+          token: ${{ steps.gitops-token.outputs.token }}
           path: compute-gitops
 
       - name: Check if app manifests exist

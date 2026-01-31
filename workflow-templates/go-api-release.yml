@@ -36,5 +36,3 @@ jobs:
       app_name: ${{ github.event.repository.name }}
       image_tag: ${{ github.event.release.tag_name }}
       bootstrap_if_missing: true
-    secrets:
-      GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
