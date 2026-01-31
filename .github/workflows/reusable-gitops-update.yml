@@ -26,7 +26,6 @@ jobs:
   update:
     runs-on: blacksmith-2vcpu-ubuntu-2204
     permissions:
-      id-token: write
       contents: read
     steps:
       - name: Get GitOps token from github-app
