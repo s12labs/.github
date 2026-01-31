@@ -28,6 +28,9 @@ jobs:
 
   build-and-deploy:
     if: github.event_name == 'release'
+    permissions:
+      contents: read
+      packages: write
     uses: s12labs/.github/.github/workflows/reusable-docker-build.yml@main
     with:
       app_name: ${{ github.event.repository.name }}
