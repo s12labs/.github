@@ -9,7 +9,7 @@ on:
 jobs:
   release-please:
     if: github.event_name == 'push'
-    runs-on: blacksmith-2vcpu
+    runs-on: blacksmith-2vcpu-ubuntu-2204
     permissions:
       contents: write
       pull-requests: write
