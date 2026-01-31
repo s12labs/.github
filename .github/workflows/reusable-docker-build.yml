@@ -1,0 +1,104 @@
+name: Reusable Docker Build
+
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        description: 'Application name (defaults to repository name)'
+        required: false
+        type: string
+      dockerfile_path:
+        description: 'Path to Dockerfile'
+        required: false
+        type: string
+        default: './Dockerfile'
+      context:
+        description: 'Build context path'
+        required: false
+        type: string
+        default: '.'
+      platforms:
+        description: 'Target platforms for build'
+        required: false
+        type: string
+        default: 'linux/amd64'
+    outputs:
+      image_tag:
+        description: 'The version tag (e.g., v0.1.0)'
+        value: ${{ jobs.build.outputs.image_tag }}
+      image_digest:
+        description: 'SHA256 digest of the built image'
+        value: ${{ jobs.build.outputs.image_digest }}
+
+jobs:
+  build:
+    runs-on: blacksmith-2vcpu
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+      image_digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set app name
+        id: app_name
+        run: |
+          if [ -n "${{ inputs.app_name }}" ]; then
+            echo "name=${{ inputs.app_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Docker Buildx with Blacksmith
+        uses: useblacksmith/setup-docker-builder@v1
+        with:
+          blacksmith-api-key: ${{ secrets.BLACKSMITH_API_KEY || '' }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/s12labs/${{ steps.app_name.outputs.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: useblacksmith/build-push-action@v2
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile_path }}
+          platforms: ${{ inputs.platforms }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+          cache-from: type=registry,ref=ghcr.io/s12labs/${{ steps.app_name.outputs.name }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/s12labs/${{ steps.app_name.outputs.name }}:buildcache,mode=max
+          blacksmith-api-key: ${{ secrets.BLACKSMITH_API_KEY || '' }}
+
+      - name: Output build summary
+        run: |
+          echo "### Docker Build Successful :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`ghcr.io/s12labs/${{ steps.app_name.outputs.name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`${{ steps.meta.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY

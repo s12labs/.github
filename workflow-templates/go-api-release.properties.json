@@ -1,0 +1,7 @@
+{
+  "name": "s12labs Go API Release and Deploy",
+  "description": "Automated release management and deployment for Go APIs to the nugget cluster",
+  "iconName": "go",
+  "categories": ["Deployment", "Go"],
+  "filePatterns": ["go.mod"]
+}

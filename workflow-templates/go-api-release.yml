@@ -1,0 +1,37 @@
+name: Release and Deploy
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: blacksmith-2vcpu
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          release-type: go
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+  build-and-deploy:
+    if: github.event_name == 'release'
+    uses: s12labs/.github/.github/workflows/reusable-docker-build.yml@main
+    with:
+      app_name: ${{ github.event.repository.name }}
+    secrets: inherit
+
+  update-gitops:
+    needs: build-and-deploy
+    uses: s12labs/.github/.github/workflows/reusable-gitops-update.yml@main
+    with:
+      app_name: ${{ github.event.repository.name }}
+      image_tag: ${{ github.event.release.tag_name }}
+      bootstrap_if_missing: true
+    secrets:
+      GITOPS_PAT: ${{ secrets.GITOPS_PAT }}

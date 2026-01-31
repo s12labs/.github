@@ -1,0 +1,113 @@
+name: Reusable GitOps Update
+
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        description: 'Application name (must match directory in compute-gitops)'
+        required: true
+        type: string
+      image_tag:
+        description: 'Image tag to deploy (e.g., v0.1.0)'
+        required: true
+        type: string
+      cluster:
+        description: 'Target cluster name'
+        required: false
+        type: string
+        default: 'nugget'
+      bootstrap_if_missing:
+        description: 'Bootstrap app manifests if they do not exist'
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      GITOPS_PAT:
+        description: 'Personal Access Token with write access to compute-gitops'
+        required: true
+
+jobs:
+  update:
+    runs-on: blacksmith-2vcpu
+    steps:
+      - name: Checkout compute-gitops repository
+        uses: actions/checkout@v4
+        with:
+          repository: s12labs/compute-gitops
+          token: ${{ secrets.GITOPS_PAT }}
+          path: compute-gitops
+
+      - name: Check if app manifests exist
+        id: check
+        run: |
+          cd compute-gitops
+          if [ -d "clusters/${{ inputs.cluster }}/${{ inputs.app_name }}" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "App manifests found at clusters/${{ inputs.cluster }}/${{ inputs.app_name }}"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "App manifests not found at clusters/${{ inputs.cluster }}/${{ inputs.app_name }}"
+          fi
+
+      - name: Bootstrap app manifests
+        if: steps.check.outputs.exists == 'false' && inputs.bootstrap_if_missing == true
+        run: |
+          cd compute-gitops
+          chmod +x scripts/bootstrap-app.sh
+          ./scripts/bootstrap-app.sh \
+            --app-name "${{ inputs.app_name }}" \
+            --cluster "${{ inputs.cluster }}" \
+            --image-tag "${{ inputs.image_tag }}" \
+            --type api
+
+      - name: Update deployment image tag
+        if: steps.check.outputs.exists == 'true' || inputs.bootstrap_if_missing == true
+        run: |
+          cd compute-gitops
+          DEPLOYMENT_FILE="clusters/${{ inputs.cluster }}/${{ inputs.app_name }}/deployment.yaml"
+
+          # Check if auto-update is disabled
+          if grep -q "# auto-update: disabled" "$DEPLOYMENT_FILE" 2>/dev/null; then
+            echo "Auto-update disabled for ${{ inputs.app_name }}, skipping update"
+            exit 0
+          fi
+
+          # Update image tag using sed
+          if [ -f "$DEPLOYMENT_FILE" ]; then
+            sed -i.bak "s|image: ghcr.io/s12labs/${{ inputs.app_name }}:.*|image: ghcr.io/s12labs/${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "$DEPLOYMENT_FILE"
+            rm -f "${DEPLOYMENT_FILE}.bak"
+            echo "Updated image tag to ${{ inputs.image_tag }} in $DEPLOYMENT_FILE"
+          else
+            echo "Error: Deployment file not found at $DEPLOYMENT_FILE"
+            exit 1
+          fi
+
+      - name: Commit and push changes
+        run: |
+          cd compute-gitops
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if there are changes to commit
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git add clusters/${{ inputs.cluster }}/${{ inputs.app_name }}/
+          git commit -m "🚀 Deploy ${{ inputs.app_name }} ${{ inputs.image_tag }}"
+          git push
+
+      - name: Output deployment summary
+        if: steps.check.outputs.exists == 'true' || inputs.bootstrap_if_missing == true
+        run: |
+          echo "### GitOps Update Successful :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**App:** \`${{ inputs.app_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster:** \`${{ inputs.cluster }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** \`${{ inputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Manifests:** \`clusters/${{ inputs.cluster }}/${{ inputs.app_name }}/\`" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check.outputs.exists }}" == "false" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo ":sparkles: **New app bootstrapped!**" >> $GITHUB_STEP_SUMMARY
+          fi
