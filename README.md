@@ -155,18 +155,28 @@ limits: {cpu: 2000m, memory: 2Gi}
 
 ## Required Organization Secrets
 
-Set these at the organization level for all repositories to use:
+**Recommended: GitHub App Authentication** (more secure, no token expiration)
 
 ```bash
-# Create a PAT with repo and packages:write scopes
-gh secret set GITOPS_PAT --org s12labs --body "$PAT"
+# Set GitHub App credentials (see GITHUB_APP_SETUP.md for details)
+gh secret set GH_APP_ID --org s12labs --visibility all --body "123456"
+gh secret set GH_APP_PRIVATE_KEY --org s12labs --visibility all < private-key.pem
 
+# Optional: Blacksmith API key for optimized builds
+gh secret set BLACKSMITH_API_KEY --org s12labs --visibility all --body "$KEY"
+```
+
+**Alternative: Personal Access Tokens** (deprecated, but supported for backwards compatibility)
+
+```bash
 # Create a PAT with repo scope for Release Please
 gh secret set RELEASE_PLEASE_TOKEN --org s12labs --body "$TOKEN"
 
-# Optional: Blacksmith API key for optimized builds
-gh secret set BLACKSMITH_API_KEY --org s12labs --body "$KEY"
+# Create a PAT with repo scope for GitOps updates
+gh secret set GITOPS_PAT --org s12labs --body "$PAT"
 ```
+
+See [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md) for complete GitHub App setup instructions.
 
 ## Architecture
 

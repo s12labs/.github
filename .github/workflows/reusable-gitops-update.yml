@@ -23,18 +23,48 @@ on:
         default: true
     secrets:
       GITOPS_PAT:
-        description: 'Personal Access Token with write access to compute-gitops'
-        required: true
+        description: 'Personal Access Token with write access to compute-gitops (deprecated, use GitHub App)'
+        required: false
+      GH_APP_ID:
+        description: 'GitHub App ID (preferred over PAT)'
+        required: false
+      GH_APP_PRIVATE_KEY:
+        description: 'GitHub App Private Key (preferred over PAT)'
+        required: false
 
 jobs:
   update:
     runs-on: blacksmith-2vcpu
     steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        if: ${{ secrets.GH_APP_ID != '' && secrets.GH_APP_PRIVATE_KEY != '' }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: s12labs
+          repositories: compute-gitops
+
+      - name: Determine authentication token
+        id: auth
+        run: |
+          if [ -n "${{ steps.app-token.outputs.token }}" ]; then
+            echo "token=${{ steps.app-token.outputs.token }}" >> $GITHUB_OUTPUT
+            echo "Using GitHub App authentication"
+          elif [ -n "${{ secrets.GITOPS_PAT }}" ]; then
+            echo "token=${{ secrets.GITOPS_PAT }}" >> $GITHUB_OUTPUT
+            echo "Using PAT authentication (deprecated)"
+          else
+            echo "Error: No authentication method available"
+            exit 1
+          fi
+
       - name: Checkout compute-gitops repository
         uses: actions/checkout@v4
         with:
           repository: s12labs/compute-gitops
-          token: ${{ secrets.GITOPS_PAT }}
+          token: ${{ steps.auth.outputs.token }}
           path: compute-gitops
 
       - name: Check if app manifests exist

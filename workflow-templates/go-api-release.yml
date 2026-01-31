@@ -14,10 +14,32 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        if: ${{ secrets.GH_APP_ID != '' && secrets.GH_APP_PRIVATE_KEY != '' }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - name: Determine authentication token
+        id: auth
+        run: |
+          if [ -n "${{ steps.app-token.outputs.token }}" ]; then
+            echo "token=${{ steps.app-token.outputs.token }}" >> $GITHUB_OUTPUT
+            echo "Using GitHub App authentication"
+          elif [ -n "${{ secrets.RELEASE_PLEASE_TOKEN }}" ]; then
+            echo "token=${{ secrets.RELEASE_PLEASE_TOKEN }}" >> $GITHUB_OUTPUT
+            echo "Using PAT authentication (deprecated)"
+          else
+            echo "token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+            echo "Using GITHUB_TOKEN (limited permissions)"
+          fi
+
       - uses: googleapis/release-please-action@v4
         with:
           release-type: go
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          token: ${{ steps.auth.outputs.token }}
 
   build-and-deploy:
     if: github.event_name == 'release'
