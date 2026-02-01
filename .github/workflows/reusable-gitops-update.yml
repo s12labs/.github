@@ -104,13 +104,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Check if there are changes to commit
-          if git diff --quiet; then
+          # Stage changes first
+          git add clusters/${{ inputs.cluster }}/${{ inputs.app_name }}/
+
+          # Check if there are staged changes to commit
+          if git diff --staged --quiet; then
             echo "No changes to commit"
             exit 0
           fi
 
-          git add clusters/${{ inputs.cluster }}/${{ inputs.app_name }}/
           git commit -m "🚀 Deploy ${{ inputs.app_name }} ${{ inputs.image_tag }}"
           git push
 
