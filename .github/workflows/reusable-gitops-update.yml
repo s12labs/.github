@@ -26,17 +26,19 @@ jobs:
   update:
     runs-on: blacksmith-2vcpu-ubuntu-2204
     permissions:
+      id-token: write
       contents: read
     steps:
       - name: Get GitOps token from github-app
         id: gitops-token
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Requesting token from github-app..."
+          echo "Requesting OIDC JWT token from GitHub..."
+          JWT_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://github-app.raven-halfbeak.ts.net" | jq -r '.value')
+
+          echo "Requesting GitOps token from github-app..."
           RESPONSE=$(curl -f -X POST \
             https://github-app.raven-halfbeak.ts.net/github/workflow-token \
-            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Authorization: Bearer $JWT_TOKEN" \
             -H "Content-Type: application/json")
 
           TOKEN=$(echo "$RESPONSE" | jq -r '.token')
