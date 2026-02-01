@@ -7,6 +7,10 @@ on:
         description: 'Application name (defaults to repository name)'
         required: false
         type: string
+      ref:
+        description: 'Git ref to checkout (tag, branch, or commit). Used for workflow_dispatch deployments.'
+        required: false
+        type: string
       dockerfile_path:
         description: 'Path to Dockerfile'
         required: false
@@ -42,6 +46,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || '' }}
 
       - name: Set app name
         id: app_name
