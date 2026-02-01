@@ -30,11 +30,13 @@ jobs:
     steps:
       - name: Get GitOps token from github-app
         id: gitops-token
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "Requesting token from github-app..."
           RESPONSE=$(curl -f -X POST \
             https://github-app.raven-halfbeak.ts.net/github/workflow-token \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Authorization: Bearer $GH_TOKEN" \
             -H "Content-Type: application/json")
 
           TOKEN=$(echo "$RESPONSE" | jq -r '.token')
